@@ -10,6 +10,9 @@ import numpy as np
 import string
 from collections import Counter
 
+from sklearn.feature_extraction.text import CountVectorizer
+
+
 
 # takes in review.json and cleans it up because it isn't in correct json format
 # --- PARAMETERS ---
@@ -71,18 +74,18 @@ class YelpData_Init():
 		stopwords = [word for word in stopwords if word not in whitelist]
 
 
-		for row in self.data:
-			sent = row['text'].lower()
-			sent = sent.translate(str.maketrans('','',string.punctuation))
-			sent = sent.translate(str.maketrans('','','1234567890'))
-			row['text'] = tokenizer(sent)
-			row['text'] = [word for word in row['text'] if word not in stopwords]
+		# for row in self.data:
+		# 	sent = row['text'].lower()
+		# 	sent = sent.translate(str.maketrans('','',string.punctuation))
+		# 	sent = sent.translate(str.maketrans('','','1234567890'))
+		# 	row['text'] = tokenizer(sent)
+		# 	row['text'] = [word for word in row['text'] if word not in stopwords]
 
 	def build_word_list(self, min_occurences=0, max_occurences=1000):
 		for row in self.data:
 			self.words.update(row['text'])
 
-		self.wordlist = [k for k,v in words.most_common() if min_occurences < v < max_occurences]
+		self.wordlist = [k for k,v in self.words.most_common() if min_occurences < v < max_occurences]
 		self.wordlist = sorted(self.wordlist)
 		# stopwords = nltk.corpus.stopwords.words('english')
 		# whitelist = ["n't", "not"]
@@ -92,18 +95,26 @@ class YelpData_Init():
  
 
 	def build_bow(self):
-		for data in self.data:
-			temp = []
-			for word in wordlist:
-				if word in data['text']:
-					temp.append(1)
-				else:
-					temp.append(0)
-			temp.append(data['stars'])
-			self.bow.append(temp)
-		# self.words = [Counter(x['text']) for x in self.data]
-		# sumbags = sum(self.words, Counter())
-		# print(sumbags)
+		# for data in self.data:
+		# 	temp = []
+		# 	for word in wordlist:
+		# 		if word in data['text']:
+		# 			temp.append(1)
+		# 		else:
+		# 			temp.append(0)
+		# 	temp.append(data['stars'])
+		# 	self.bow.append(temp)
+		# # self.words = [Counter(x['text']) for x in self.data]
+		# # sumbags = sum(self.words, Counter())
+		# # print(sumbags)
+		text = [x['text'] for x in self.data]
+		vectorizer = CountVectorizer(analyzer='word')
+		X = vectorizer.fit_transform(text)
+		# print(X.toarray())
+		# print(vectorizer.get_feature_names())
+		Y = [x['stars'] for x in self.data]
+
+		return (X,Y)
 
 
 if __name__ == '__main__':
@@ -114,10 +125,9 @@ if __name__ == '__main__':
 	stuff = YelpData_Init()
 	stuff.initialize('r.json')
 	stuff.tokenize()
-	# print(stuff.data[0])
 	stuff.build_word_list()
-	print(len(stuff.words))
-	print(stuff.words.most_common(5))
+	# print(len(stuff.words))
+	# print(stuff.words.most_common(5))
 	stuff.build_bow()
 
 
