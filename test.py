@@ -11,6 +11,8 @@ import string
 from collections import Counter
 
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
 
 
 
@@ -116,6 +118,21 @@ class YelpData_Init():
 
 		return (X,Y)
 
+	def classify(self):
+		X,Y = self.build_bow()
+		Xtr, Xte, Ytr, Yte = train_test_split(X,Y, test_size=.33, random_state=42)
+		# print(Xtr.shape)
+		# print(Ytr.shape)
+		# print(Xte.shape)
+		# print(Yte.shape)
+
+		model = MultinomialNB()
+		model.fit(Xtr, Ytr)
+		predicted = model.predict(Xte)
+		print(predicted)
+
+
+
 
 if __name__ == '__main__':
 	
@@ -128,8 +145,7 @@ if __name__ == '__main__':
 	stuff.build_word_list()
 	# print(len(stuff.words))
 	# print(stuff.words.most_common(5))
-	stuff.build_bow()
-
+	stuff.classify()
 
 
 
