@@ -14,8 +14,10 @@ from collections import Counter
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from sklearn.feature_extraction.text import TfidfTransformer
 
 import nltk.classify.util
 
@@ -102,39 +104,69 @@ class YelpData_Init():
 	# recall: how many relevant items are selected?
 	# precision: how many selected items are relevant?
 	# f1 score: harmonic mean of precision and recall. Also kinda like an accuracy rating
-	def classify(self, classifier):
-		classifier_name = str(type(classifier).__name__)
-		print("CLASSIFIER = " + classifier_name)
-
+	def classify(self, classifiers):
 		X, Y = self.build_bow()
 		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
 
-		model = classifier.fit(Xtr, Ytr)
-		predicted = model.predict(Xte)
+		for classifier in classifiers:
+			classifier_name = str(type(classifier).__name__)
+			print("CLASSIFIER = " + classifier_name)
 
-		list_of_labels = sorted(list(set(Ytr)))
+			model = classifier.fit(Xtr, Ytr)
+			predicted = model.predict(Xte)
 
-		accuracy = accuracy_score(Yte, predicted)
-		recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-		precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-		f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+			list_of_labels = sorted(list(set(Ytr)))
 
-		print("=================== Results ===================")
-		print("           Negative    Positive")
-		print("F1       " + str(f1))
-		print("Precision" + str(precision))
-		print("Recall   " + str(recall))
-		print("Accuracy " + str(accuracy))
-		print("===============================================")
+			accuracy = accuracy_score(Yte, predicted)
+			recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+			precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+
+			print("=================== Results ===================")
+			print("           Negative    Positive")
+			print("F1       " + str(f1))
+			print("Precision" + str(precision))
+			print("Recall   " + str(recall))
+			print("Accuracy " + str(accuracy))
+			print("===============================================")
+
+	def tfidfClassify(self, classifiers):
+		X, Y = self.build_bow()
+		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
+
+		for classifier in classifiers:
+			classifier_name = str(type(classifier).__name__)
+			print("CLASSIFIER = " + classifier_name)
+
+			Xtr_tfidf = TfidfTransformer().fit_transform(Xtr)
+			model = classifier.fit(Xtr_tfidf, Ytr)
+
+			predicted = model.predict(Xte)
+
+			list_of_labels = sorted(list(set(Ytr)))
+
+			accuracy = accuracy_score(Yte, predicted)
+			recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+			precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+
+			print("=================== Results ===================")
+			print("           Negative    Positive")
+			print("F1       " + str(f1))
+			print("Precision" + str(precision))
+			print("Recall   " + str(recall))
+			print("Accuracy " + str(accuracy))
+			print("===============================================")
 
 
 
 if __name__ == '__main__':
-	stuff = YelpData_Init()
-	stuff.initialize('set10k.json')
-	stuff.tokenize()
-	stuff.build_word_list()
+	sentiment = YelpData_Init()
+	sentiment.initialize('set10k.json')
+	sentiment.tokenize()
+	sentiment.build_word_list()
 	# print(len(stuff.words))
 	# print(stuff.words.most_common(5))
-	stuff.classify(MultinomialNB())
-	stuff.classify(LogisticRegression())
+	sentiment.classify([MultinomialNB(),LogisticRegression()])
+	sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
+	#sentiment.classify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
