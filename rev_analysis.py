@@ -83,7 +83,6 @@ class YelpData_Init():
 	def build_word_list(self, min_occurences=0, max_occurences=1000):
 		for row in self.data:
 			self.words.update(row['text'])
-
 		self.wordlist = [k for k, v in self.words.most_common() if min_occurences < v < max_occurences]
 		self.wordlist = sorted(self.wordlist)
 
@@ -107,7 +106,7 @@ class YelpData_Init():
 	def classify(self, classifiers):
 		X, Y = self.build_bow()
 		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
-
+		print(Xtr.shape,Xte.shape)
 		for classifier in classifiers:
 			classifier_name = str(type(classifier).__name__)
 			print("CLASSIFIER = " + classifier_name)
@@ -122,12 +121,18 @@ class YelpData_Init():
 			precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 
+			folds = 10
+			scores = cross_val_score(model, X, Y, cv = folds)
+
 			print("=================== Results ===================")
 			print("           Negative    Positive")
 			print("F1       " + str(f1))
 			print("Precision" + str(precision))
 			print("Recall   " + str(recall))
 			print("Accuracy " + str(accuracy))
+			print("Cross-validation with {} folds:".format(folds))
+			print("\t Scores: {}".format(scores))
+			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
 			print("===============================================")
 
 	def tfidfClassify(self, classifiers):
@@ -150,12 +155,18 @@ class YelpData_Init():
 			precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 
-			print("=================== Results ===================")
+			folds = 10
+			scores = cross_val_score(model, X, Y, cv=folds)
+
+			print("=================== Results (TFIDF) ===================")
 			print("           Negative    Positive")
 			print("F1       " + str(f1))
 			print("Precision" + str(precision))
 			print("Recall   " + str(recall))
 			print("Accuracy " + str(accuracy))
+			print("Cross-validation with {} folds:".format(folds))
+			print("\t Scores: {}".format(scores))
+			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
 			print("===============================================")
 
 
@@ -165,8 +176,7 @@ if __name__ == '__main__':
 	sentiment.initialize('set10k.json')
 	sentiment.tokenize()
 	sentiment.build_word_list()
-	# print(len(stuff.words))
-	# print(stuff.words.most_common(5))
 	sentiment.classify([MultinomialNB(),LogisticRegression()])
+
 	sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
 	#sentiment.classify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
