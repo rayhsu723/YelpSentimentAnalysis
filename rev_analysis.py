@@ -1,6 +1,7 @@
 import json
 import nltk
 from nltk.tokenize import RegexpTokenizer, word_tokenize
+from nltk.tag import pos_tag
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -96,6 +97,24 @@ class YelpData_Init():
 		# print(vectorizer.get_feature_names())
 		Y = [x['stars'] for x in self.data]
 
+
+		return (X, Y)
+
+	def pos_tagging(self, universal = False):
+		if universal:
+			tags = [pos_tag(word_tokenize(x['text']), tagset= 'universal')for x in self.data][0]
+
+		else:
+			tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
+
+		text = ['_'.join(list(t)) for t in tags]
+		vectorizer = CountVectorizer(analyzer='word')
+		X = vectorizer.fit_transform(text)
+		# print(X.toarray())
+		# print(vectorizer.get_feature_names())
+		Y = [x['stars'] for x in self.data]
+
+
 		return (X, Y)
 
 	# give it a classifier from sklearn that will be used to determine accuracy, recall, precision, and f1 score
@@ -158,7 +177,7 @@ class YelpData_Init():
 			folds = 10
 			scores = cross_val_score(model, X, Y, cv=folds)
 
-			print("=================== Results (TFIDF) ===================")
+			print("=================== Results ===================")
 			print("           Negative    Positive")
 			print("F1       " + str(f1))
 			print("Precision" + str(precision))
@@ -176,7 +195,9 @@ if __name__ == '__main__':
 	sentiment.initialize('set10k.json')
 	sentiment.tokenize()
 	sentiment.build_word_list()
-	sentiment.classify([MultinomialNB(),LogisticRegression()])
+	sentiment.pos_tagging()
+	print("done")
+	#sentiment.classify([MultinomialNB(),LogisticRegression()])
 
-	sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
-	#sentiment.classify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
+	#sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
+	#sentiment.clas/sify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
