@@ -1,10 +1,14 @@
 import json
+import ijson
 import nltk
 from nltk.tokenize import RegexpTokenizer, word_tokenize
 from nltk.tag import pos_tag
 
-nltk.download('punkt')
-nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('stopwords')
+# nltk.download('averaged_perceptron_tagger')
+nltk.download('universal_tagset')
+
 # from pprint import pprint
 import os
 import re
@@ -21,6 +25,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_sc
 from sklearn.feature_extraction.text import TfidfTransformer
 
 import nltk.classify.util
+from nltk.sentiment.util import mark_negation
 
 
 # takes in review.json and cleans it up because it isn't in correct json format
@@ -89,9 +94,25 @@ class YelpData_Init():
 
 
 	# uses a count vectorizer to create a sparse matrix of reviews
-	def build_bow(self):
-		text = [x['text'] for x in self.data]
-		vectorizer = CountVectorizer(analyzer='word')
+	def build_bow(self, POS=True, negation=True, ngram_range=(1,2), universal=False):
+		text = []
+		# print(self.data[0]['text'])
+
+		if negation==True:
+			text = [' '.join(mark_negation(x['text'].replace('.', ' .').split())) for x in self.data]
+		else:
+			text = [x['text'] for x in self.data]
+		# print(len(text))
+
+		if POS==True:
+			# for t in text:
+			# 	t = re.sub(r'[^\w\s]','',t)			
+			# tags = [pos_tag(word_tokenize(x), tagset='universal') for x in text][0]
+			# text = ['_'.join(list(t)) for t in tags]
+
+		# mark_negation(text, shallow=True)
+
+		vectorizer = CountVectorizer(ngram_range=ngram_range, token_pattern=r'\b\w+\b', min_df=1)
 		X = vectorizer.fit_transform(text)
 		# print(X.toarray())
 		# print(vectorizer.get_feature_names())
@@ -102,12 +123,13 @@ class YelpData_Init():
 
 	def pos_tagging(self, universal = False):
 		if universal:
-			tags = [pos_tag(word_tokenize(x['text']), tagset= 'universal')for x in self.data][0]
+			tags = [pos_tag(word_tokenize(x['text']), tagset='universal')for x in self.data][0]
 
 		else:
 			tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
 
 		text = ['_'.join(list(t)) for t in tags]
+
 		vectorizer = CountVectorizer(analyzer='word')
 		X = vectorizer.fit_transform(text)
 		# print(X.toarray())
@@ -117,17 +139,25 @@ class YelpData_Init():
 
 		return (X, Y)
 
+	def build_bigram_bow(self):
+		text = [x['text'] for x in self.data]
+		vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=r'\b\w+\b', min_df=1)
+		X = vectorizer.fit_transform(text)
+		Y = [x['stars'] for x in self.data]
+
+		return (X,Y)
+
 	# give it a classifier from sklearn that will be used to determine accuracy, recall, precision, and f1 score
 	# accuracy: self-explanatory
 	# recall: how many relevant items are selected?
 	# precision: how many selected items are relevant?
 	# f1 score: harmonic mean of precision and recall. Also kinda like an accuracy rating
-	def classify(self, classifiers):
-		X, Y = self.build_bow()
+	def classify(self, classifiers, POS=True, negation=True, ngram_range=(1,2), min_df=1, max_df=10000):
+		X, Y = self.build_bow(POS=True, negation=True, ngram_range=(1,2))
 		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
-		print(Xtr.shape,Xte.shape)
+		# print(Xtr.shape,Xte.shape)
 		for classifier in classifiers:
-			classifier_name = str(type(classifier).__name__)
+			classifier_name = str(type(classifier).__name__)  
 			print("CLASSIFIER = " + classifier_name)
 
 			model = classifier.fit(Xtr, Ytr)
@@ -135,7 +165,7 @@ class YelpData_Init():
 
 			list_of_labels = sorted(list(set(Ytr)))
 
-			accuracy = accuracy_score(Yte, predicted)
+			# accuracy = accuracy_score(Yte, predicted)
 			recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 			precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
@@ -148,45 +178,45 @@ class YelpData_Init():
 			print("F1       " + str(f1))
 			print("Precision" + str(precision))
 			print("Recall   " + str(recall))
-			print("Accuracy " + str(accuracy))
+			# print("Accuracy " + str(accuracy))
 			print("Cross-validation with {} folds:".format(folds))
 			print("\t Scores: {}".format(scores))
 			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
 			print("===============================================")
 
-	def tfidfClassify(self, classifiers):
-		X, Y = self.build_bow()
-		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
+	# def tfidfClassify(self, classifiers):
+	# 	X, Y = self.build_bow()
+	# 	Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
 
-		for classifier in classifiers:
-			classifier_name = str(type(classifier).__name__)
-			print("CLASSIFIER = " + classifier_name)
+	# 	for classifier in classifiers:
+	# 		classifier_name = str(type(classifier).__name__)
+	# 		print("CLASSIFIER = " + classifier_name)
 
-			Xtr_tfidf = TfidfTransformer().fit_transform(Xtr)
-			model = classifier.fit(Xtr_tfidf, Ytr)
+	# 		Xtr_tfidf = TfidfTransformer().fit_transform(Xtr)
+	# 		model = classifier.fit(Xtr_tfidf, Ytr)
 
-			predicted = model.predict(Xte)
+	# 		predicted = model.predict(Xte)
 
-			list_of_labels = sorted(list(set(Ytr)))
+	# 		list_of_labels = sorted(list(set(Ytr)))
 
-			accuracy = accuracy_score(Yte, predicted)
-			recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-			precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+	# 		accuracy = accuracy_score(Yte, predicted)
+	# 		recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+	# 		precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
+	# 		f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 
-			folds = 10
-			scores = cross_val_score(model, X, Y, cv=folds)
+	# 		folds = 10
+	# 		scores = cross_val_score(model, X, Y, cv=folds)
 
-			print("=================== Results ===================")
-			print("           Negative    Positive")
-			print("F1       " + str(f1))
-			print("Precision" + str(precision))
-			print("Recall   " + str(recall))
-			print("Accuracy " + str(accuracy))
-			print("Cross-validation with {} folds:".format(folds))
-			print("\t Scores: {}".format(scores))
-			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
-			print("===============================================")
+	# 		print("=================== Results ===================")
+	# 		print("           Negative    Positive")
+	# 		print("F1       " + str(f1))
+	# 		print("Precision" + str(precision))
+	# 		print("Recall   " + str(recall))
+	# 		print("Accuracy " + str(accuracy))
+	# 		print("Cross-validation with {} folds:".format(folds))
+	# 		print("\t Scores: {}".format(scores))
+	# 		print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
+	# 		print("===============================================")
 
 
 
@@ -196,8 +226,17 @@ if __name__ == '__main__':
 	sentiment.tokenize()
 	sentiment.build_word_list()
 	sentiment.pos_tagging()
-	print("done")
+	# print("done")
 	#sentiment.classify([MultinomialNB(),LogisticRegression()])
 
 	#sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
 	#sentiment.clas/sify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
+	# print(len(stuff.words))
+	# print(stuff.words.most_common(5))
+
+
+	sentiment.classify([LogisticRegression()])
+
+
+	# sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
+	#sentiment.classify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
