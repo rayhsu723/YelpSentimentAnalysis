@@ -84,6 +84,13 @@ class YelpData_Init():
 		whitelist = ["n't", "not"]
 		stopwords = [word for word in stopwords if word not in whitelist]
 
+		for x in self.data:
+			temp = tokenizer(x['text'])
+			for word in list(temp):
+				if word in stopwords:
+					temp.remove(word)
+			x['text'] = ' '.join(temp)
+ 
 
 	# builds the word list
 	def build_word_list(self, min_occurences=0, max_occurences=1000):
@@ -101,15 +108,12 @@ class YelpData_Init():
 		if negation==True:
 			text = [' '.join(mark_negation(x['text'].replace('.', ' .').split())) for x in self.data]
 		else:
-			text = [x['text'] for x in self.data]
+			text = [x['text'] for x in self.data]\
+
 		# print(len(text))
 
-                #Tagging for part of speech. Has universal flag included
+				#Tagging for part of speech. Has universal flag included
 		if POS==True:
-			# for t in text:
-			# 	t = re.sub(r'[^\w\s]','',t)			
-			# tags = [pos_tag(word_tokenize(x), tagset='universal') for x in text][0]
-			# text = ['_'.join(list(t)) for t in tags]
 			if universal:
 				tags = [pos_tag(word_tokenize(x['text']), tagset='universal') for x in self.data][0]
 			else:
@@ -126,33 +130,33 @@ class YelpData_Init():
 		Y = [x['stars'] for x in self.data]
 
 
-		return (X, Y)
-    #
+		return (X, np.asarray(Y))
+	#
 	# def pos_tagging(self, universal = False):
 	# 	if universal:
 	# 		tags = [pos_tag(word_tokenize(x['text']), tagset='universal')for x in self.data][0]
-    #
+	#
 	# 	else:
 	# 		tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
-    #
+	#
 	# 	text = ['_'.join(list(t)) for t in tags]
-    #
+	#
 	# 	vectorizer = CountVectorizer(analyzer='word')
 	# 	X = vectorizer.fit_transform(text)
 	# 	# print(X.toarray())
 	# 	# print(vectorizer.get_feature_names())
 	# 	Y = [x['stars'] for x in self.data]
-    #
-    #
+	#
+	#
 	# 	return (X, Y)
 
-	def build_bigram_bow(self):
-		text = [x['text'] for x in self.data]
-		vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=r'\b\w+\b', min_df=1)
-		X = vectorizer.fit_transform(text)
-		Y = [x['stars'] for x in self.data]
+	# def build_bigram_bow(self):
+	# 	text = [x['text'] for x in self.data]
+	# 	vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=r'\b\w+\b', min_df=1)
+	# 	X = vectorizer.fit_transform(text)
+	# 	Y = [x['stars'] for x in self.data]
 
-		return (X,Y)
+	# 	return (X,Y)
 
 	# give it a classifier from sklearn that will be used to determine accuracy, recall, precision, and f1 score
 	# accuracy: self-explanatory
@@ -229,16 +233,10 @@ class YelpData_Init():
 
 if __name__ == '__main__':
 	sentiment = YelpData_Init()
-	sentiment.initialize('set10k.json')
+	sentiment.initialize('set1000.json')
 	sentiment.tokenize()
 	sentiment.build_word_list()
-	sentiment.pos_tagging()
-	# print("done")
-	#sentiment.classify([MultinomialNB(),LogisticRegression()])
 
-	#sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
-	#sentiment.clas/sify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
-	# print(len(stuff.words))
 	# print(stuff.words.most_common(5))
 
 
