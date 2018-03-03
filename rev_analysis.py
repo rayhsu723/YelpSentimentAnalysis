@@ -104,6 +104,7 @@ class YelpData_Init():
 			text = [x['text'] for x in self.data]
 		# print(len(text))
 
+                #Tagging for part of speech. Has universal flag included
 		if POS==True:
 			# for t in text:
 			# 	t = re.sub(r'[^\w\s]','',t)			
