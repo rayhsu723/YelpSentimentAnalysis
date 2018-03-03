@@ -109,6 +109,12 @@ class YelpData_Init():
 			# 	t = re.sub(r'[^\w\s]','',t)			
 			# tags = [pos_tag(word_tokenize(x), tagset='universal') for x in text][0]
 			# text = ['_'.join(list(t)) for t in tags]
+			if universal:
+				tags = [pos_tag(word_tokenize(x['text']), tagset='universal') for x in self.data][0]
+			else:
+				tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
+
+			text = ['_'.join(list(t)) for t in tags]
 
 		# mark_negation(text, shallow=True)
 
@@ -120,24 +126,24 @@ class YelpData_Init():
 
 
 		return (X, Y)
-
-	def pos_tagging(self, universal = False):
-		if universal:
-			tags = [pos_tag(word_tokenize(x['text']), tagset='universal')for x in self.data][0]
-
-		else:
-			tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
-
-		text = ['_'.join(list(t)) for t in tags]
-
-		vectorizer = CountVectorizer(analyzer='word')
-		X = vectorizer.fit_transform(text)
-		# print(X.toarray())
-		# print(vectorizer.get_feature_names())
-		Y = [x['stars'] for x in self.data]
-
-
-		return (X, Y)
+    #
+	# def pos_tagging(self, universal = False):
+	# 	if universal:
+	# 		tags = [pos_tag(word_tokenize(x['text']), tagset='universal')for x in self.data][0]
+    #
+	# 	else:
+	# 		tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
+    #
+	# 	text = ['_'.join(list(t)) for t in tags]
+    #
+	# 	vectorizer = CountVectorizer(analyzer='word')
+	# 	X = vectorizer.fit_transform(text)
+	# 	# print(X.toarray())
+	# 	# print(vectorizer.get_feature_names())
+	# 	Y = [x['stars'] for x in self.data]
+    #
+    #
+	# 	return (X, Y)
 
 	def build_bigram_bow(self):
 		text = [x['text'] for x in self.data]
