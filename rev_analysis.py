@@ -108,18 +108,24 @@ class YelpData_Init():
 		if negation==True:
 			text = [' '.join(mark_negation(x['text'].replace('.', ' .').split())) for x in self.data]
 		else:
-			text = [x['text'] for x in self.data]\
+			text = [x['text'] for x in self.data]
 
 		# print(len(text))
 
 				#Tagging for part of speech. Has universal flag included
-		if POS==True:
-			if universal:
-				tags = [pos_tag(word_tokenize(x['text']), tagset='universal') for x in self.data][0]
-			else:
-				tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
 
-			text = ['_'.join(list(t)) for t in tags]
+		if POS==True:
+			text = []
+			if universal:
+				pos = [pos_tag(word_tokenize(x['text']), tagset='universal') for x in self.data]
+
+			else:
+				pos = [pos_tag(word_tokenize(x['text'])) for x in self.data]
+
+			for pair in pos:
+				text.append(' '.join(['_'.join(list(p)) for p in pair]))
+
+
 
 		# mark_negation(text, shallow=True)
 
@@ -132,21 +138,26 @@ class YelpData_Init():
 
 		return (X, np.asarray(Y))
 	#
-	# def pos_tagging(self, universal = False):
-	# 	if universal:
-	# 		tags = [pos_tag(word_tokenize(x['text']), tagset='universal')for x in self.data][0]
-	#
-	# 	else:
-	# 		tags = [pos_tag(word_tokenize(x['text'])) for x in self.data][0]
-	#
+	def pos_tagging(self, universal = False):
+		text = []
+		if universal:
+			pos = [pos_tag(word_tokenize(x['text']), tagset='universal') for x in self.data]
+
+		else:
+			pos = [pos_tag(word_tokenize(x['text'])) for x in self.data[:2]]
+
+		for pair in pos:
+			text.append(' '.join(['_'.join(list(p)) for p in pair]))
+
+		print(text)
 	# 	text = ['_'.join(list(t)) for t in tags]
-	#
+	# 	print(text)
 	# 	vectorizer = CountVectorizer(analyzer='word')
 	# 	X = vectorizer.fit_transform(text)
 	# 	# print(X.toarray())
 	# 	# print(vectorizer.get_feature_names())
 	# 	Y = [x['stars'] for x in self.data]
-	#
+	# #
 	#
 	# 	return (X, Y)
 
@@ -163,8 +174,9 @@ class YelpData_Init():
 	# recall: how many relevant items are selected?
 	# precision: how many selected items are relevant?
 	# f1 score: harmonic mean of precision and recall. Also kinda like an accuracy rating
+
 	def classify(self, classifiers, POS=True, negation=True, ngram_range=(1,2), min_df=1, max_df=10000):
-		X, Y = self.build_bow(POS=True, negation=True, ngram_range=(1,2))
+		X, Y = self.build_bow(POS=True, negation=False, ngram_range=(1,2))
 		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
 		# print(Xtr.shape,Xte.shape)
 		for classifier in classifiers:
@@ -239,8 +251,8 @@ if __name__ == '__main__':
 
 	# print(stuff.words.most_common(5))
 
-
-	sentiment.classify([LogisticRegression()])
+	#sentiment.pos_tagging()
+	sentiment.classify([MultinomialNB(),LogisticRegression()])
 
 
 	# sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
