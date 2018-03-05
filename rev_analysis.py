@@ -7,7 +7,7 @@ from nltk.tag import pos_tag
 # nltk.download('punkt')
 # nltk.download('stopwords')
 # nltk.download('averaged_perceptron_tagger')
-nltk.download('universal_tagset')
+# nltk.download('universal_tagset')
 
 # from pprint import pprint
 import os
@@ -17,15 +17,19 @@ import string
 from collections import Counter
 
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
-from sklearn.feature_extraction.text import TfidfTransformer
+# from sklearn.feature_extraction.text import TfidfTransformer
 
 import nltk.classify.util
 from nltk.sentiment.util import mark_negation
+
+
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.naive_bayes import GaussianNB
 
 
 # takes in review.json and cleans it up because it isn't in correct json format
@@ -35,7 +39,7 @@ from nltk.sentiment.util import mark_negation
 # num_of_reviews: determines how many reviews we want to get from review.json
 def clean_data(filename, outfile, num_of_reviews=10000):
 	out = open(outfile, 'w')
-	print('[', file=output)
+	print('[', file=out)
 	file = open(filename, 'r')
 
 	for r in range(num_of_reviews - 1):
@@ -58,6 +62,8 @@ class YelpData_Init():
 		self.words = Counter()
 		# every single word that appears in the reviews
 		self.wordlist = []
+
+		self.seed=42
 
 	# file is too large and in incorrect format so we need to clean it up
 	def initialize(self, json_file):
@@ -84,20 +90,38 @@ class YelpData_Init():
 		whitelist = ["n't", "not"]
 		stopwords = [word for word in stopwords if word not in whitelist]
 
+		# for x in self.data:
+		# 	temp = tokenizer(x['text'])
+		# 	for word in list(temp):
+		# 		if word in stopwords:
+		# 			temp.remove(word)
+		# 	x['text'] = ' '.join(temp)
 		for x in self.data:
 			temp = tokenizer(x['text'])
 			for word in list(temp):
-				if word in stopwords:
+				if word.lower() in stopwords or word.lower() not in self.wordlist:
 					temp.remove(word)
 			x['text'] = ' '.join(temp)
  
 
 	# builds the word list
-	def build_word_list(self, min_occurences=0, max_occurences=1000):
+	def build_word_list(self, min_occurences=0, max_occurences=100000):
 		for row in self.data:
-			self.words.update(row['text'])
+			self.words.update(nltk.word_tokenize(row['text'].lower()))
 		self.wordlist = [k for k, v in self.words.most_common() if min_occurences < v < max_occurences]
 		self.wordlist = sorted(self.wordlist)
+		
+		# stopwords = nltk.corpus.stopwords.words('english')
+		# whitelist = ["n't", "not"]
+
+		# for idx, stop_word in enumerate(stopwords):
+		# 	if stop_word not in whitelist:
+		# 		del self.words[stop_word]
+
+		# for punc in string.punctuation:
+		# 	if punc in self.words:
+		# 		del self.words[punc]
+		print(len(self.wordlist))
 
 
 	# uses a count vectorizer to create a sparse matrix of reviews
@@ -125,18 +149,17 @@ class YelpData_Init():
 			for pair in pos:
 				text.append(' '.join(['_'.join(list(p)) for p in pair]))
 
-
-
 		# mark_negation(text, shallow=True)
 
 		vectorizer = CountVectorizer(ngram_range=ngram_range, token_pattern=r'\b\w+\b', min_df=1)
+
 		X = vectorizer.fit_transform(text)
-		# print(X.toarray())
 		# print(vectorizer.get_feature_names())
 		Y = [x['stars'] for x in self.data]
 
 
 		return (X, np.asarray(Y))
+
 	#
 	def pos_tagging(self, universal = False):
 		text = []
@@ -161,23 +184,20 @@ class YelpData_Init():
 	#
 	# 	return (X, Y)
 
-	# def build_bigram_bow(self):
-	# 	text = [x['text'] for x in self.data]
-	# 	vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=r'\b\w+\b', min_df=1)
-	# 	X = vectorizer.fit_transform(text)
-	# 	Y = [x['stars'] for x in self.data]
 
-	# 	return (X,Y)
 
 	# give it a classifier from sklearn that will be used to determine accuracy, recall, precision, and f1 score
 	# accuracy: self-explanatory
 	# recall: how many relevant items are selected?
 	# precision: how many selected items are relevant?
 	# f1 score: harmonic mean of precision and recall. Also kinda like an accuracy rating
-
-	def classify(self, classifiers, POS=True, negation=True, ngram_range=(1,2), min_df=1, max_df=10000):
-		X, Y = self.build_bow(POS=True, negation=False, ngram_range=(1,2))
-		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
+	def classify(self, classifiers, POS=True, negation=True, ngram_range=(1,2), min_df=1, max_df=100000):
+		self.initialize('set1000.json')
+		self.build_word_list(min_occurences=min_df, max_occurences=max_df)
+		self.tokenize()
+		# self.build_word_list(min_occurences=min_df, max_occurences=max_df)
+		X, Y = self.build_bow(POS=True, negation=True, ngram_range=ngram_range)
+		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=self.seed)
 		# print(Xtr.shape,Xte.shape)
 		for classifier in classifiers:
 			classifier_name = str(type(classifier).__name__)  
@@ -207,53 +227,23 @@ class YelpData_Init():
 			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
 			print("===============================================")
 
-	# def tfidfClassify(self, classifiers):
-	# 	X, Y = self.build_bow()
-	# 	Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=42)
-
-	# 	for classifier in classifiers:
-	# 		classifier_name = str(type(classifier).__name__)
-	# 		print("CLASSIFIER = " + classifier_name)
-
-	# 		Xtr_tfidf = TfidfTransformer().fit_transform(Xtr)
-	# 		model = classifier.fit(Xtr_tfidf, Ytr)
-
-	# 		predicted = model.predict(Xte)
-
-	# 		list_of_labels = sorted(list(set(Ytr)))
-
-	# 		accuracy = accuracy_score(Yte, predicted)
-	# 		recall = recall_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-	# 		precision = precision_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-	# 		f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
-
-	# 		folds = 10
-	# 		scores = cross_val_score(model, X, Y, cv=folds)
-
-	# 		print("=================== Results ===================")
-	# 		print("           Negative    Positive")
-	# 		print("F1       " + str(f1))
-	# 		print("Precision" + str(precision))
-	# 		print("Recall   " + str(recall))
-	# 		print("Accuracy " + str(accuracy))
-	# 		print("Cross-validation with {} folds:".format(folds))
-	# 		print("\t Scores: {}".format(scores))
-	# 		print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
-	# 		print("===============================================")
-
-
-
 if __name__ == '__main__':
+
+	# clean_data('review.json', 'set30k.json', 30000)
 	sentiment = YelpData_Init()
-	sentiment.initialize('set1000.json')
-	sentiment.tokenize()
-	sentiment.build_word_list()
-
-	# print(stuff.words.most_common(5))
-
-	#sentiment.pos_tagging()
-	sentiment.classify([MultinomialNB(),LogisticRegression()])
 
 
-	# sentiment.tfidfClassify([MultinomialNB(),LogisticRegression()])
-	#sentiment.classify(RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75))
+	# sentiment.initialize('set1000.json')
+	# sentiment.build_word_list(min_occurences=3)
+
+	# sentiment.tokenize()
+
+
+	sentiment.classify([LogisticRegression()], min_df=10)
+
+
+
+
+	sentiment.classify([LogisticRegression(), MultinomialNB(), RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75), AdaBoostClassifier()], min_df=5)
+
+
