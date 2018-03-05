@@ -3,6 +3,8 @@ import ijson
 import nltk
 from nltk.tokenize import RegexpTokenizer, word_tokenize
 from nltk.tag import pos_tag
+import matplotlib.pyplot as plt
+plt.interactive(False)
 
 # nltk.download('punkt')
 # nltk.download('stopwords')
@@ -62,8 +64,10 @@ class YelpData_Init():
 		self.words = Counter()
 		# every single word that appears in the reviews
 		self.wordlist = []
-
+		self.stars = {1: 0, 2:0, 3:0, 4:0, 5:0}
 		self.seed=42
+		self.X = None
+		self.Y = None
 
 	# file is too large and in incorrect format so we need to clean it up
 	def initialize(self, json_file):
@@ -78,6 +82,7 @@ class YelpData_Init():
 			element.pop('funny', None)
 			element.pop('cool', None)
 			element.pop('useful', None)
+			self.stars[element['stars']] += 1
 			if element['stars'] == 4 or element['stars'] == 5:
 				element['stars'] = 'p'
 			elif element['stars'] == 2 or element['stars'] == 1:
@@ -172,17 +177,6 @@ class YelpData_Init():
 		for pair in pos:
 			text.append(' '.join(['_'.join(list(p)) for p in pair]))
 
-		print(text)
-	# 	text = ['_'.join(list(t)) for t in tags]
-	# 	print(text)
-	# 	vectorizer = CountVectorizer(analyzer='word')
-	# 	X = vectorizer.fit_transform(text)
-	# 	# print(X.toarray())
-	# 	# print(vectorizer.get_feature_names())
-	# 	Y = [x['stars'] for x in self.data]
-	# #
-	#
-	# 	return (X, Y)
 
 
 
@@ -192,12 +186,12 @@ class YelpData_Init():
 	# precision: how many selected items are relevant?
 	# f1 score: harmonic mean of precision and recall. Also kinda like an accuracy rating
 	def classify(self, classifiers, POS=True, negation=True, ngram_range=(1,2), min_df=1, max_df=100000):
-		self.initialize('set1000.json')
+		self.initialize('set50k.json')
 		self.build_word_list(min_occurences=min_df, max_occurences=max_df)
 		self.tokenize()
 		# self.build_word_list(min_occurences=min_df, max_occurences=max_df)
-		X, Y = self.build_bow(POS=True, negation=True, ngram_range=ngram_range)
-		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=self.seed)
+		self.X, self.Y = self.build_bow(POS=True, negation=True, ngram_range=ngram_range)
+		Xtr, Xte, Ytr, Yte = train_test_split(self.X, self.Y, test_size=.33, random_state=self.seed)
 		# print(Xtr.shape,Xte.shape)
 		for classifier in classifiers:
 			classifier_name = str(type(classifier).__name__)  
@@ -214,7 +208,7 @@ class YelpData_Init():
 			f1 = f1_score(Yte, predicted, pos_label=None, average=None, labels=list_of_labels)
 
 			folds = 10
-			scores = cross_val_score(model, X, Y, cv = folds)
+			scores = cross_val_score(model, self.X, self.Y, cv = folds)
 
 			print("=================== Results ===================")
 			print("           Negative    Positive")
@@ -227,6 +221,26 @@ class YelpData_Init():
 			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
 			print("===============================================")
 
+	def dataStats(self):
+		print(self.stars)
+		reviews, vocabulary = self.X.shape
+		print(self.X.shape)
+		count = 0
+		total = 0
+		for review in self.data:
+			total += len(review['text'].split())
+			count += 1
+
+		avg_length = total/count
+		print(avg_length)
+
+		plt.bar(list(self.stars.keys()),self.stars.values(), color = 'g', width = .5)
+		plt.title("Histogram of Rated Stars")
+		plt.xlabel("Stars")
+		plt.ylabel("Number of Reviews")
+		plt.show()
+
+
 if __name__ == '__main__':
 
 	# clean_data('review.json', 'set30k.json', 30000)
@@ -238,12 +252,10 @@ if __name__ == '__main__':
 
 	# sentiment.tokenize()
 
-
 	sentiment.classify([LogisticRegression()], min_df=10)
 
+	#sentiment.dataStats()
 
-
-
-	sentiment.classify([LogisticRegression(), MultinomialNB(), RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75), AdaBoostClassifier()], min_df=5)
+#sentiment.classify([LogisticRegression(), MultinomialNB(), RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75), AdaBoostClassifier()], min_df=5)
 
 
