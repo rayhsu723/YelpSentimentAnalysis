@@ -8,6 +8,7 @@ from nltk.tag import pos_tag
 # nltk.download('stopwords')
 # nltk.download('averaged_perceptron_tagger')
 # nltk.download('universal_tagset')
+nltk.download('vader_lexicon')
 
 # from pprint import pprint
 import os
@@ -30,6 +31,8 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB
+
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 
 # takes in review.json and cleans it up because it isn't in correct json format
@@ -65,10 +68,14 @@ class YelpData_Init():
 
 		self.seed=42
 
+		self.threes=[]
+
 	# file is too large and in incorrect format so we need to clean it up
 	def initialize(self, json_file):
 		with open(json_file, 'r', encoding='utf8') as f:
 			self.data = json.load(f)
+
+			self.threes = [x['text'] for x in self.data if x['stars']==3]
 			self.data = [x for x in self.data if x['stars'] != 3]
 		for element in self.data:
 			element.pop('review_id', None)
@@ -99,7 +106,7 @@ class YelpData_Init():
 		for x in self.data:
 			temp = tokenizer(x['text'])
 			for word in list(temp):
-				if word.lower() in stopwords or word.lower() not in self.wordlist:
+				if word.lower() not in self.wordlist:
 					temp.remove(word)
 			x['text'] = ' '.join(temp)
  
@@ -111,8 +118,8 @@ class YelpData_Init():
 		self.wordlist = [k for k, v in self.words.most_common() if min_occurences < v < max_occurences]
 		self.wordlist = sorted(self.wordlist)
 		
-		# stopwords = nltk.corpus.stopwords.words('english')
-		# whitelist = ["n't", "not"]
+		stopwords = nltk.corpus.stopwords.words('english')
+		whitelist = ["n't", "not"]
 
 		# for idx, stop_word in enumerate(stopwords):
 		# 	if stop_word not in whitelist:
@@ -129,14 +136,11 @@ class YelpData_Init():
 		text = []
 		# print(self.data[0]['text'])
 
-		if negation==True:
+		if negation:
 			text = [' '.join(mark_negation(x['text'].replace('.', ' .').split())) for x in self.data]
 		else:
 			text = [x['text'] for x in self.data]
 
-		# print(len(text))
-
-				#Tagging for part of speech. Has universal flag included
 
 		if POS==True:
 			text = []
@@ -149,6 +153,7 @@ class YelpData_Init():
 			for pair in pos:
 				text.append(' '.join(['_'.join(list(p)) for p in pair]))
 
+		# print(text[0])
 		# mark_negation(text, shallow=True)
 
 		vectorizer = CountVectorizer(ngram_range=ngram_range, token_pattern=r'\b\w+\b', min_df=1)
@@ -158,7 +163,7 @@ class YelpData_Init():
 		Y = [x['stars'] for x in self.data]
 
 
-		return (X, np.asarray(Y))
+		return (X, np.asarray(Y), vectorizer)
 
 	#
 	def pos_tagging(self, universal = False):
@@ -184,7 +189,35 @@ class YelpData_Init():
 	#
 	# 	return (X, Y)
 
+	def build_threes_bow(self, POS=True, negation=True, ngram_range=(1,2), universal=False):
+		text = []
+		# print(self.data[0]['text'])
 
+		if negation:
+			text = [' '.join(mark_negation(x['text'].replace('.', ' .').split())) for x in self.data]
+		else:
+			text = [x['text'] for x in self.data]
+
+
+		if POS==True:
+			text = []
+			if universal:
+				pos = [pos_tag(word_tokenize(x['text']), tagset='universal') for x in self.data]
+
+			else:
+				pos = [pos_tag(word_tokenize(x['text'])) for x in self.data]
+
+			for pair in pos:
+				text.append(' '.join(['_'.join(list(p)) for p in pair]))
+
+		# print(text[0])
+		# mark_negation(text, shallow=True)
+
+		vectorizer = CountVectorizer(ngram_range=ngram_range, token_pattern=r'\b\w+\b', min_df=1)
+
+		X = vectorizer.fit_transform(text)
+
+		return X
 
 	# give it a classifier from sklearn that will be used to determine accuracy, recall, precision, and f1 score
 	# accuracy: self-explanatory
@@ -192,16 +225,19 @@ class YelpData_Init():
 	# precision: how many selected items are relevant?
 	# f1 score: harmonic mean of precision and recall. Also kinda like an accuracy rating
 	def classify(self, classifiers, POS=True, negation=True, ngram_range=(1,2), min_df=1, max_df=100000):
-		self.initialize('set1000.json')
+		self.initialize('set10k.json')
 		self.build_word_list(min_occurences=min_df, max_occurences=max_df)
 		self.tokenize()
 		# self.build_word_list(min_occurences=min_df, max_occurences=max_df)
-		X, Y = self.build_bow(POS=True, negation=True, ngram_range=ngram_range)
+		X, Y, vectorizer = self.build_bow(POS=True, negation=True, ngram_range=ngram_range)
+		X3 = self.build_threes_bow(POS=True, negation=True, ngram_range=ngram_range)
 		Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=.33, random_state=self.seed)
 		# print(Xtr.shape,Xte.shape)
 		for classifier in classifiers:
 			classifier_name = str(type(classifier).__name__)  
 			print("CLASSIFIER = " + classifier_name)
+
+			# ---------------------------------
 
 			model = classifier.fit(Xtr, Ytr)
 			predicted = model.predict(Xte)
@@ -227,6 +263,40 @@ class YelpData_Init():
 			print("\t Accuracy: {} (+/- {:.2f})".format(scores.mean(), scores.std() * 2))
 			print("===============================================")
 
+			three_predict = model.predict(X3)
+			three_vader = []
+			sid = SentimentIntensityAnalyzer()
+			for sentence in self.threes:
+				ss = sid.polarity_scores(sentence)
+				if ss['compound'] > 0:
+					three_vader.append('p')
+				else:
+					three_vader.append('n')
+
+
+			differences = []
+			sentiment_d = [0,0]
+			for pn in range(len(three_vader)):
+				if three_vader[pn] != three_predict[pn]:
+					x = str(pn) + three_vader[pn]
+					if three_vader[pn] == 'p':
+						sentiment_d[0] += 1
+					else:
+						sentiment_d[1] += 1
+					differences.append(x)
+
+			print(differences)
+			print(sentiment_d)
+
+			def informative_features(vectorizer, clf, n=20):
+				feature_names = vectorizer.get_feature_names()
+				coefs_with_fns = sorted(zip(clf.coef_[0], feature_names))
+				top = zip(coefs_with_fns[:n], coefs_with_fns[:-(n+1):-1])
+				for (coef_1, fn_1), (coef_2, fn_2) in top:
+					print ("\t%.4f\t%-15s\t\t%.4f\t%-15s" % (coef_1, fn_1, coef_2, fn_2))
+
+			informative_features(vectorizer, model)
+
 if __name__ == '__main__':
 
 	# clean_data('review.json', 'set30k.json', 30000)
@@ -239,11 +309,12 @@ if __name__ == '__main__':
 	# sentiment.tokenize()
 
 
+	# sentiment.classify([LogisticRegression()], min_df=10)
+
+
+
+
+	# sentiment.classify([LogisticRegression(), MultinomialNB(), RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75), AdaBoostClassifier()], POS=False, negation=False, ngram_range=(1,1))
 	sentiment.classify([LogisticRegression()], min_df=10)
-
-
-
-
-	sentiment.classify([LogisticRegression(), MultinomialNB(), RandomForestClassifier(n_estimators=25,max_depth=75,max_features=.75), AdaBoostClassifier()], min_df=5)
 
 
